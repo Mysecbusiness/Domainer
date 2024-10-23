@@ -1,7 +1,6 @@
 const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
-const functions = require("firebase-functions");
 const app = express();
 const port = 3000;
 // Middleware to parse JSON
