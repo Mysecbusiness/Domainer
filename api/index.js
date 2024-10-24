@@ -1,16 +1,19 @@
 const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
+
 const app = express();
 const port = 3000;
+
 // Middleware to parse JSON
 app.use(express.json());
 
-// Scraping functions for each search engine
+// Scraping function
 async function scrapeGoogle(query) {
     const headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     };
+
     try {
         const response = await axios.get(`https://www.google.com/search?q=${query}`, { headers });
         return response.data;
@@ -20,84 +23,22 @@ async function scrapeGoogle(query) {
     }
 }
 
-async function scrapeBing(query) {
-    const headers = { 'User-Agent': 'Mozilla/5.0' };
-    try {
-        const response = await axios.get(`https://www.bing.com/search?q=${query}`, { headers });
-        return response.data;
-    } catch (error) {
-        console.error('Error scraping Bing:', error);
-        return null;
-    }
-}
-
-async function scrapeDuckDuckGo(query) {
-    const headers = { 'User-Agent': 'Mozilla/5.0' };
-    try {
-        const response = await axios.get(`https://duckduckgo.com/?q=${query}`, { headers });
-        return response.data;
-    } catch (error) {
-        console.error('Error scraping DuckDuckGo:', error);
-        return null;
-    }
-}
-
-async function scrapeYahoo(query) {
-    const headers = { 'User-Agent': 'Mozilla/5.0' };
-    try {
-        const response = await axios.get(`https://search.yahoo.com/search?p=${query}`, { headers });
-        return response.data;
-    } catch (error) {
-        console.error('Error scraping Yahoo:', error);
-        return null;
-    }
-}
-
-async function scrapeBaidu(query) {
-    const headers = { 'User-Agent': 'Mozilla/5.0' };
-    try {
-        const response = await axios.get(`https://www.baidu.com/s?wd=${query}`, { headers });
-        return response.data;
-    } catch (error) {
-        console.error('Error scraping Baidu:', error);
-        return null;
-    }
-}
-
 // Extract links function
-function extractLinks(html, engine) {
+function extractLinks(html) {
     const $ = cheerio.load(html);
     const links = [];
 
-    let selector;
-    switch (engine) {
-        case 'google':
-            selector = 'a';
-            break;
-        case 'bing':
-            selector = '.b_algo a';
-            break;
-        case 'duckduckgo':
-            selector = '.result__a';
-            break;
-        case 'yahoo':
-            selector = 'h3.title a';
-            break;
-        case 'baidu':
-            selector = '.result a';
-            break;
-        default:
-            selector = 'a';
-    }
-    $(selector).each((index, element) => {
+    $('a').each((index, element) => {
         const link = $(element).attr('href');
         const anchorText = $(element).text().trim(); // Extract anchor text
         if (link) {
             links.push({ link, anchorText });
         }
     });
+
     return links;
 }
+
 // Calculate domain authority based on unique domains
 function calculateDomainAuthority(links) {
     const uniqueDomains = new Set();
@@ -163,58 +104,32 @@ function calculateAverageRank(links) {
 function calculateKeywordsRank(links) {
     return links.length * 20;
 }
-app.get('/', async (req, res) => {
-    res.json({massage: 'welcome to Domain authority checker'})
-});
+
 // API route for domain metrics with more factors
 app.get('/domain-metrics', async (req, res) => {
     const query = req.query.query; // Accept 'query' parameter in the GET request
-    const engines = ['google', 'bing', 'duckduckgo', 'yahoo', 'baidu']; // List of search engines
-    const allLinks = [];
 
     if (!query) {
         return res.status(400).json({ success: false, message: 'Query parameter is required' });
     }
 
-    for (const engine of engines) {
-        let html;
-        try {
-            switch (engine) {
-                case 'google':
-                    html = await scrapeGoogle(query);
-                    break;
-                case 'bing':
-                    html = await scrapeBing(query);
-                    break;
-                case 'duckduckgo':
-                    html = await scrapeDuckDuckGo(query);
-                    break;
-                case 'yahoo':
-                    html = await scrapeYahoo(query);
-                    break;
-                case 'baidu':
-                    html = await scrapeBaidu(query);
-                    break;
-                default:
-                    continue;
-            }
-            const links = extractLinks(html, engine);
-            allLinks.push(...links);
-        } catch (error) {
-            console.error(`Error scraping ${engine}:`, error);
-        }
+    const html = await scrapeGoogle(query);
+    if (!html) {
+        return res.status(500).json({ success: false, message: 'Failed to scrape data' });
     }
 
-    // Calculating all metrics from the aggregated links
-    const domainPower = calculateDomainPower(allLinks);
-    const organicClicks = calculateOrganicClicks(allLinks);
-    const averageRank = calculateAverageRank(allLinks);
-    const keywordsRank = calculateKeywordsRank(allLinks);
-    const domainAuthority = calculateDomainAuthority(allLinks);
-    const httpsPercentage = calculateHttpsPercentage(allLinks);
-    const backlinkCount = calculateBacklinkCount(allLinks);
-    const uniqueDomainCount = calculateUniqueDomainCount(allLinks);
-    const averageAnchorTextLength = calculateAverageAnchorTextLength(allLinks);
+    const links = extractLinks(html);
+
+    // Calculating all metrics
+    const domainPower = calculateDomainPower(links);
+    const organicClicks = calculateOrganicClicks(links);
+    const averageRank = calculateAverageRank(links);
+    const keywordsRank = calculateKeywordsRank(links);
+    const domainAuthority = calculateDomainAuthority(links);
+    const httpsPercentage = calculateHttpsPercentage(links);
+    const backlinkCount = calculateBacklinkCount(links);
+    const uniqueDomainCount = calculateUniqueDomainCount(links);
+    const averageAnchorTextLength = calculateAverageAnchorTextLength(links);
 
     res.json({
         success: true,
@@ -232,6 +147,7 @@ app.get('/domain-metrics', async (req, res) => {
         }
     });
 });
+
 // Start the server
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
