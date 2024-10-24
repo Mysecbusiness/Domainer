@@ -91,10 +91,7 @@ function extractLinks(html, engine) {
             selector = 'a';
     }
     $(selector).each((index, element) => {
-        let link = $(element).attr('href');
-        if (link.startsWith('/url?q=')) {
-            link = link.split('/url?q=')[1].split('&')[0]; // Clean Google redirect URLs
-        }
+        const link = $(element).attr('href');
         const anchorText = $(element).text().trim(); // Extract anchor text
         if (link) {
             links.push({ link, anchorText });
@@ -103,40 +100,21 @@ function extractLinks(html, engine) {
     return links;
 }
 
-// Enhanced domain authority calculation
+// Metric calculations
 function calculateDomainAuthority(links) {
     const uniqueDomains = new Set();
-    let totalHttps = 0;
-    let totalBacklinks = 0;
-
     links.forEach(({ link }) => {
         try {
             const fullLink = new URL(link, 'https://www.google.com');
             const domain = fullLink.hostname;
             uniqueDomains.add(domain);
-
-            if (fullLink.protocol === 'https:') {
-                totalHttps++;
-            }
-            if (!link.includes('google.com')) {
-                totalBacklinks++;
-            }
         } catch (err) {
             console.error(`Invalid URL encountered: ${link}`, err);
         }
     });
-
-    // Domain authority calculation with improved weighting
-    const domainCount = uniqueDomains.size;
-    const httpsRatio = (totalHttps / links.length) * 100;
-    const backlinksCount = totalBacklinks;
-    
-    // Example weighting: Domain count (50%), HTTPS percentage (25%), Backlinks (25%)
-    const domainAuthorityScore = (domainCount * 0.5) + (httpsRatio * 0.25) + (backlinksCount * 0.25);
-    return Math.round(domainAuthorityScore); // Return a whole number for simplicity
+    return uniqueDomains.size * 15;
 }
 
-// Other metrics
 function calculateHttpsPercentage(links) {
     const httpsLinks = links.filter(({ link }) => link.startsWith('https://')).length;
     return (httpsLinks / links.length) * 100;
@@ -165,16 +143,14 @@ function calculateAverageAnchorTextLength(links) {
     const totalLength = links.reduce((acc, { anchorText }) => acc + anchorText.length, 0);
     return totalLength / links.length;
 }
-
 app.get('/', async (req, res) => {
-    res.json({ message: 'Welcome to the Domain Authority Checker' });
+    res.json({massage: 'welcome to Domain authority checker'})
 });
-
 // API route for domain metrics
 app.get('/domain-metrics', async (req, res) => {
     const query = req.query.query;
     const engines = ['google', 'bing', 'duckduckgo', 'yahoo', 'baidu'];
-    const allLinks = [];
+    const result = {};
 
     if (!query) {
         return res.status(400).json({ success: false, message: 'Query parameter is required' });
@@ -202,29 +178,25 @@ app.get('/domain-metrics', async (req, res) => {
                 default:
                     continue;
             }
+
             const links = extractLinks(html, engine);
-            allLinks.push(...links);
+            result[engine] = {
+                domain_authority: calculateDomainAuthority(links),
+                https_percentage: calculateHttpsPercentage(links),
+                backlink_count: calculateBacklinkCount(links),
+                unique_domain_count: calculateUniqueDomainCount(links),
+                average_anchor_text_length: calculateAverageAnchorTextLength(links),
+            };
         } catch (error) {
             console.error(`Error scraping ${engine}:`, error);
+            result[engine] = { error: `Error scraping ${engine}` };
         }
     }
-
-    const domainAuthority = calculateDomainAuthority(allLinks);
-    const httpsPercentage = calculateHttpsPercentage(allLinks);
-    const backlinkCount = calculateBacklinkCount(allLinks);
-    const uniqueDomainCount = calculateUniqueDomainCount(allLinks);
-    const averageAnchorTextLength = calculateAverageAnchorTextLength(allLinks);
 
     res.json({
         success: true,
         message: 'Generated Domain Data Successfully',
-        result: {
-            domain_authority: domainAuthority,
-            https_percentage: httpsPercentage,
-            backlink_count: backlinkCount,
-            unique_domain_count: uniqueDomainCount,
-            average_anchor_text_length: averageAnchorTextLength
-        }
+        result
     });
 });
 
