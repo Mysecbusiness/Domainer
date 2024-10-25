@@ -143,6 +143,71 @@ function calculateAverageAnchorTextLength(links) {
     const totalLength = links.reduce((acc, { anchorText }) => acc + anchorText.length, 0);
     return totalLength / links.length;
 }
+// Calculate domain authority based on unique domains
+function calculateDomainAuthority(links) {
+    const uniqueDomains = new Set();
+    links.forEach(({ link }) => {
+        try {
+            const fullLink = new URL(link, 'https://www.google.com'); // Ensure the URL is absolute
+            const domain = fullLink.hostname;
+            uniqueDomains.add(domain);
+        } catch (err) {
+            console.error(`Invalid URL encountered: ${link}`, err);
+        }
+    });
+    return uniqueDomains.size * 15; // Arbitrary multiplier for domain authority
+}
+
+// Count the number of HTTPS links
+function calculateHttpsPercentage(links) {
+    const httpsLinks = links.filter(({ link }) => link.startsWith('https://')).length;
+    return (httpsLinks / links.length) * 100;
+}
+
+// Count backlinks (external links)
+function calculateBacklinkCount(links) {
+    const externalLinks = links.filter(({ link }) => !link.includes('google.com')).length; // Filter out internal Google links
+    return externalLinks;
+}
+
+// Count unique domains in links
+function calculateUniqueDomainCount(links) {
+    const uniqueDomains = new Set();
+    links.forEach(({ link }) => {
+        try {
+            const fullLink = new URL(link, 'https://www.google.com'); // Ensure the URL is absolute
+            const domain = fullLink.hostname;
+            uniqueDomains.add(domain);
+        } catch (err) {
+            console.error(`Invalid URL encountered: ${link}`, err);
+        }
+    });
+    return uniqueDomains.size;
+}
+
+// Calculate the average length of anchor texts
+function calculateAverageAnchorTextLength(links) {
+    const totalLength = links.reduce((acc, { anchorText }) => acc + anchorText.length, 0);
+    return totalLength / links.length;
+}
+
+// Existing metric calculation functions
+function calculateDomainPower(links) {
+    return links.length * 10;
+}
+
+function calculateOrganicClicks(links) {
+    return links.length * 50;
+}
+
+function calculateAverageRank(links) {
+    const ranks = links.map((_, index) => index + 1);
+    return ranks.reduce((a, b) => a + b, 0) / ranks.length;
+}
+
+function calculateKeywordsRank(links) {
+    return links.length * 20;
+}
 app.get('/', async (req, res) => {
     res.json({massage: 'welcome to Domain authority checker'})
 });
@@ -186,6 +251,19 @@ app.get('/domain-metrics', async (req, res) => {
                 backlink_count: calculateBacklinkCount(links),
                 unique_domain_count: calculateUniqueDomainCount(links),
                 average_anchor_text_length: calculateAverageAnchorTextLength(links),
+                domainPower : calculateDomainPower(links),
+                organicClicks : calculateOrganicClicks(links),
+                averageRank : calculateAverageRank(links),
+                keywordsRank : calculateKeywordsRank(links),
+                httpsPercentage : calculateHttpsPercentage(links),
+                // organicClicks : calculateOrganicClicks(allLinks),
+                // averageRank : calculateAverageRank(allLinks),
+                // keywordsRank : calculateKeywordsRank(allLinks),
+                // domainAuthority : calculateDomainAuthority(allLinks),
+                // httpsPercentage : calculateHttpsPercentage(allLinks),
+                // backlinkCount : calculateBacklinkCount(allLinks),
+                // uniqueDomainCount : calculateUniqueDomainCount(allLinks),
+                // averageAnchorTextLength : calculateAverageAnchorTextLength(allLinks),
             };
         } catch (error) {
             console.error(`Error scraping ${engine}:`, error);
